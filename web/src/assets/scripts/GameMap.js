@@ -1,5 +1,6 @@
 import {AcGameObject} from "@/assets/scripts/AcGameObject";
 import {Wall} from "@/assets/scripts/Wall";
+import {Snake} from "@/assets/scripts/Snake";
 
 export class GameMap extends AcGameObject {
     //ctx画布 parent画布的父元素 用于动态修改画布的长宽  因为用户可能会修改浏览的大小
@@ -10,10 +11,15 @@ export class GameMap extends AcGameObject {
         this.L = 0;//地图中每一个小方块的边长
 
         this.rows = 13;//地图的行数
-        this.cols = 13;
+        this.cols = 14;
 
         this.inner_walls_count = 20;//设置地图内部障碍物的数量
         this.walls = [];//墙的数组，用来存储所有的墙
+
+        this.snakes = [
+            new Snake({id:0,color:"#4876EC",r:this.rows-2,c:1},this),
+            new Snake({id:1,color:"#F94848",r:1,c:this.cols-2},this),
+        ]
     }
 
     //判断蛇出生的位置是否连通
@@ -53,15 +59,15 @@ export class GameMap extends AcGameObject {
         //创建随机障碍物，这些障碍物按照左上到右下的对角线对称，所以只需要随机一半即可
         for (let i = 0; i < this.inner_walls_count/2; i++) {
             for (let j = 0; j < 1000; j++) {
-                let r = parseInt(Math.random() * this.cols);//得到随机横坐标
+                let r = parseInt(Math.random() * this.rows);//得到随机横坐标
                 let c = parseInt(Math.random() * this.cols);//得到随机纵坐标
                 // 如果当前已经有障碍物了就重新放
-                if(g[r][c] || g[c][r]) continue;
+                if(g[r][c] || g[this.rows - 1 - r][this.cols - 1 - c]) continue;
 
                 //如果生成在了左下角或者右上角就要重新生成，因为我们需要让蛇初始位置在这两个位置
                 if((r === this.rows-2 && c === 1) || (r === 1 && c === this.cols-2)) continue;
 
-                g[r][c] = g[c][r] = true;//放置障碍物
+                g[r][c] = g[this.rows - 1 - r][this.cols - 1 - c] = true;//放置障碍物
                 break;
             }
         }
@@ -82,10 +88,27 @@ export class GameMap extends AcGameObject {
         return true;
     }
 
+    //获取用户输入
+    add_listening_events(){
+        this.ctx.canvas.focus();
+        const [snake0,snake1] = this.snakes;
+        this.ctx.canvas.addEventListener("keydown",e => {
+            if(e.key === 'w') snake0.set_direction(0);
+            else if(e.key === 'd') snake0.set_direction(1);
+            else if(e.key === 's') snake0.set_direction(2);
+            else if(e.key === 'a') snake0.set_direction(3);
+            else if(e.key === 'ArrowUp') snake1.set_direction(0);
+            else if(e.key === 'ArrowRight') snake1.set_direction(1);
+            else if(e.key === 'ArrowDown') snake1.set_direction(2);
+            else if(e.key === 'ArrowLeft') snake1.set_direction(3);
+        });
+    }
+
     start() {
         for(let i = 0;i<1000;++i)
             if(this.create_walls())
                 break;
+        this.add_listening_events();
     }
 
     update_size() {//更新边长
@@ -95,8 +118,43 @@ export class GameMap extends AcGameObject {
         this.ctx.canvas.height = this.L * this.rows;
     }
 
+    check_ready(){ //判断两条蛇是否准备好下一回合了
+        for(const snake of this.snakes){
+            //如果当前状态是静止的话才能动
+            if(snake.status !== "idle") return false;
+            //如果没有接收到下一步的指令 就能动
+            if(snake.direction === -1) return false;
+        }
+        return true;
+    }
+
+    next_step(){ // 让两条蛇进入下一回合
+        for(const snake of this.snakes){
+            snake.next_step();
+        }
+    }
+
+    check_valid(cell) {//检测目标位置是否合法 ： 没有撞到某条蛇的身体和强
+        for (const wall of this.walls) {
+            if (wall.r === cell.r && wall.c === cell.c) return false;
+        }
+
+        for (const snake of this.snakes) {
+            let k = snake.cells.length;
+            if (!snake.check_tail_increasing()) { //当蛇尾会前进的时候 蛇尾可以走 不用判断
+                k--;
+            }
+            for (let i = 0; i < k; ++i) {
+                if (snake.cells[i].r === cell.r && snake.cells[i].c === cell.c) return false;
+            }
+        }
+        return true;
+    }
     update() {
         this.update_size();//更新一下地图的比例，防止用户修改了浏览器尺寸，导致游戏显示不正常，每次渲染都需要判断
+        if(this.check_ready()){
+            this.next_step();
+        }
         this.render();
     }
 

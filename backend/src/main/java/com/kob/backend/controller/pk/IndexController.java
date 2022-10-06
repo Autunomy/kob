@@ -11,7 +11,7 @@ import java.util.Map;
 @RequestMapping("/pk")
 public class IndexController {
 
-    @RequestMapping("getbotinfo")
+    @RequestMapping("/getbotinfo")
     public Map<String,String> getBotInfo(){
         Map<String,String> map = new HashMap<>();
         map.put("name","tiger");

@@ -25,11 +25,11 @@
                         <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                             <li><router-link class="dropdown-item" :to="{name:'user_bot_index'}">我的bot</router-link></li>
                             <li><hr></li>
-                            <li><a class="dropdown-item" to="#" @click="logout">退出</a></li>
+                            <li><a class="dropdown-item" href="#" @click="logout">退出</a></li>
                         </ul>
                     </li>
                 </ul>
-                <ul class="navbar-nav" v-else>
+                <ul class="navbar-nav" v-else-if="!$store.state.user.pulling_info">
                     <li class="nav-item dropdown">
                         <router-link class="nav-link" :to="{name:'user_account_login'}"  role="button">
                             登陆

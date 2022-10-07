@@ -1,4 +1,5 @@
 import $ from 'jquery';
+import router from "@/router";
 
 export default {
     state: {
@@ -7,6 +8,7 @@ export default {
         photo:"",
         token:"",
         is_login:false,
+        pulling_info:true,//是否正在拉取信息
     },
     getters: {
     },
@@ -26,6 +28,10 @@ export default {
             state.photo = "";
             state.token = "";
             state.is_login = false;
+            router.push({name:"user_account_login"})
+        },
+        updatePullingInfo(state,pulling_info){
+            state.pulling_info = pulling_info;
         }
     },
     actions: {
@@ -35,10 +41,13 @@ export default {
                 type:"post",
                 data:{
                     username:data.username,
-                    password:data.username,
+                    password:data.password,
                 },
                 success(resp){
+                    console.log(resp)
                     if(resp.error_message === "success"){
+                        //将token持久化
+                        localStorage.setItem("jwt_token",resp.token);
                         context.commit("updateToken",resp.token);
                         data.success(resp);
                     }else{
@@ -74,6 +83,7 @@ export default {
             })
         },
         logout(context){
+            localStorage.removeItem("jwt_token");
             context.commit("logout");
         },
     },

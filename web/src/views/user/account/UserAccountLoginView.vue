@@ -1,5 +1,5 @@
 <template>
-    <ContentField>
+    <ContentField v-if="!$store.state.user.pulling_info">
         <div class="row justify-content-md-center">
             <div class="col-3">
                 <form @submit.prevent="login">
@@ -12,7 +12,7 @@
                         <input v-model="password" type="password" class="form-control" id="password" placeholder="请输入密码">
                     </div>
                     <div class="error-message">{{error_message}}</div>
-                    <button type="submit" class="btn btn-primary">提交</button>
+                    <button type="submit" class="btn btn-primary">登录</button>
                 </form>
             </div>
         </div>
@@ -35,6 +35,23 @@ export default {
         let username = ref("");
         let password = ref("");
         let error_message = ref("");
+        //设置变量让页面先不展示，因为如果展示的话就会有一瞬间展示了登陆页面，然后跳转到首页
+
+        const jwt_token = localStorage.getItem("jwt_token");
+        if(jwt_token){
+            store.commit("updateToken",jwt_token);
+            store.dispatch("getInfo",{
+                success(){
+                    router.push({name:"home"})
+                    store.commit("updatePullingInfo",false);
+                },
+                error(){
+                    store.commit("updatePullingInfo",false);
+                },
+            })
+        }else{
+            store.commit("updatePullingInfo",false);
+        }
 
         const login = () => {
             error_message.value = "";
@@ -44,11 +61,10 @@ export default {
                 success(){
                     store.dispatch("getInfo",{
                         success(){
-                            console.log(store.state.user);
                             router.push({name:"home"})
                         },
-                        error(){
-                            error_message.value = "获取用户信息失败"
+                        error(resp){
+                            error_message.value = "获取用户信息失败:"+resp.error_message;
                         }
                     })
                 },

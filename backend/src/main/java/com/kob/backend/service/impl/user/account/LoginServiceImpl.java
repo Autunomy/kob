@@ -20,6 +20,7 @@ public class LoginServiceImpl implements LoginService {
 
     @Override
     public Map<String, String> getToken(String username, String password) {
+        Map<String,String> map = new HashMap<>();
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(username,password);
         Authentication authenticate = authenticationManager.authenticate(authenticationToken);
@@ -27,7 +28,7 @@ public class LoginServiceImpl implements LoginService {
         User user = loginUser.getUser();
 
         String jwt = JwtUtil.createJWT(user.getId().toString());
-        Map<String,String> map = new HashMap<>();
+
         map.put("error_message","success");
         map.put("token",jwt);
 

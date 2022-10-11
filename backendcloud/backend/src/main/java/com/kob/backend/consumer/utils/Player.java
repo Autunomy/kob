@@ -12,6 +12,9 @@ import java.util.List;
 @NoArgsConstructor
 public class Player {
     private Integer id;
+    private Integer botId;//-1表示亲自出马  否则表示ai
+    private String botCode;
+
     private Integer sx;//起点的位置
     private Integer sy;
     private List<Integer> steps;//存储玩家的路径

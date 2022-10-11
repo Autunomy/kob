@@ -2,8 +2,11 @@ package com.kob.backend.consumer.utils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.kob.backend.consumer.WebSocketServer;
+import com.kob.backend.pojo.Bot;
 import com.kob.backend.pojo.Record;
 import org.springframework.security.core.parameters.P;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -11,7 +14,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class Game extends Thread{
+public class Game extends Thread {
     private final Integer rows;
     private final Integer cols;
     private final Integer inner_walls_count;
@@ -19,7 +22,7 @@ public class Game extends Thread{
     private final int[][] g;
     private final static int[] dx = {-1, 0, 1, 0}, dy = {0, 1, 0, -1};
 
-    private final Player playerA,playerB;
+    private final Player playerA, playerB;
 
     private Integer nextStepA = null;
     private Integer nextStepB = null;
@@ -28,20 +31,41 @@ public class Game extends Thread{
     private String status = "playing";//playing->finished
     private String loser = "";//all 平局 A A输  B B输
 
-    public Game(Integer rows, Integer cols, Integer inner_walls_count,Integer idA,Integer idB) {
+    private final static String addBotUrl = "http://127.0.0.1:3002/bot/add/";
+
+    public Game(Integer rows,
+                Integer cols,
+                Integer inner_walls_count,
+                Integer idA,
+                Bot botA,
+                Integer idB,
+                Bot botB) {
         this.rows = rows;
         this.cols = cols;
         this.inner_walls_count = inner_walls_count;
         this.g = new int[rows][cols];
-        playerA = new Player(idA,this.rows - 2,1,new ArrayList<>());
-        playerB = new Player(idB,1,this.cols - 2,new ArrayList<>());
+
+        Integer botIdA = -1, botIdB = -1;
+        String botCodeA = "", botCodeB = "";
+
+        if (botA != null) {
+            botIdA = botA.getId();
+            botCodeA = botA.getContent();
+        }
+        if (botB != null) {
+            botIdB = botB.getId();
+            botCodeB = botB.getContent();
+        }
+
+        playerA = new Player(idA, botIdA, botCodeA, this.rows - 2, 1, new ArrayList<>());
+        playerB = new Player(idB, botIdB, botCodeB, 1, this.cols - 2, new ArrayList<>());
     }
 
-    public Player getPlayerA(){
+    public Player getPlayerA() {
         return playerA;
     }
 
-    public Player getPlayerB(){
+    public Player getPlayerB() {
         return playerB;
     }
 
@@ -53,7 +77,7 @@ public class Game extends Thread{
         lock.lock();//由于会涉及到两个线程操作同一个变量，所以需要加锁
         try {
             this.nextStepA = nextStepA;
-        }finally {
+        } finally {
             lock.unlock();
         }
     }
@@ -62,7 +86,7 @@ public class Game extends Thread{
         lock.lock();
         try {
             this.nextStepB = nextStepB;
-        }finally {
+        } finally {
             lock.unlock();
         }
     }
@@ -71,7 +95,7 @@ public class Game extends Thread{
         if (sx == tx && sy == ty) return true;
         g[sx][sy] = 1;
 
-        for (int i = 0; i < 4; i ++ ) {
+        for (int i = 0; i < 4; i++) {
             int x = sx + dx[i], y = sy + dy[i];
             if (x >= 0 && x < this.rows && y >= 0 && y < this.cols && g[x][y] == 0) {
                 if (check_connectivity(x, y, tx, ty)) {
@@ -123,23 +147,58 @@ public class Game extends Thread{
         }
     }
 
-    private boolean nextStep(){//等待两个玩家的下一步操作
+    private String getInput(Player player){//将当前的局面信息编码成字符串发送给bot
+        Player me,you;
+        if(playerA.getId().equals(player.getId())){
+            me = playerA;
+            you = playerB;
+        }else{
+            me = playerB;
+            you = playerA;
+        }
+
+        return getMapString() + "#" +
+                me.getSx() + "#" +
+                me.getSy() + "#(" +
+                me.getStepsString() + ")#" +
+                you.getSx() + "#" +
+                you.getSy() + "#(" +
+                you.getStepsString() + ")#";
+
+    }
+
+    private void sendBotCode(Player player){
+        if(player.getBotId().equals(-1)){//人亲自出马 不需要执行代码
+            return;
+        }
+        MultiValueMap<String,String> data = new LinkedMultiValueMap<>();
+        data.add("user_id",player.getId().toString());
+        data.add("bot_code",player.getBotCode());
+        data.add("input",getInput(player));
+        WebSocketServer.restTemplate.postForObject(addBotUrl,data,String.class);
+    }
+
+    private boolean nextStep() {//等待两个玩家的下一步操作
         try {
             Thread.sleep(200);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        for(int i=0;i<50;++i){
+
+        sendBotCode(playerA);
+        sendBotCode(playerB);
+
+        for (int i = 0; i < 50; ++i) {
             try {
                 Thread.sleep(100);
                 lock.lock();
                 try {
-                    if(nextStepA != null && nextStepB != null){
+                    if (nextStepA != null && nextStepB != null) {
                         playerA.getSteps().add(nextStepA);
                         playerB.getSteps().add(nextStepB);
                         return true;
                     }
-                }finally {
+                } finally {
                     lock.unlock();
                 }
             } catch (InterruptedException e) {
@@ -149,78 +208,78 @@ public class Game extends Thread{
         return false;
     }
 
-    private boolean check_valid(List<Cell> cellsA,List<Cell> cellsB){
+    private boolean check_valid(List<Cell> cellsA, List<Cell> cellsB) {
         int n = cellsA.size();
-        Cell cell = cellsA.get(n-1);
-        if(g[cell.x][cell.y] == 1) return false;
+        Cell cell = cellsA.get(n - 1);
+        if (g[cell.x][cell.y] == 1) return false;
 
-        for(int i=0;i<n-1;++i){
-            if(cellsA.get(i).x == cell.x && cellsA.get(i).y == cell.y)
+        for (int i = 0; i < n - 1; ++i) {
+            if (cellsA.get(i).x == cell.x && cellsA.get(i).y == cell.y)
                 return false;
         }
         n = cellsB.size();
-        for(int i=0;i<n-1;++i){
-            if(cellsB.get(i).x == cell.x && cellsB.get(i).y == cell.y)
+        for (int i = 0; i < n - 1; ++i) {
+            if (cellsB.get(i).x == cell.x && cellsB.get(i).y == cell.y)
                 return false;
         }
 
         return true;
     }
 
-    private void judge(){//判断两名玩家下一步操作是否合法
+    private void judge() {//判断两名玩家下一步操作是否合法
         List<Cell> cellsA = playerA.getCells();
         List<Cell> cellsB = playerB.getCells();
 
-        boolean validA = check_valid(cellsA,cellsB);
-        boolean validB = check_valid(cellsB,cellsA);
+        boolean validA = check_valid(cellsA, cellsB);
+        boolean validB = check_valid(cellsB, cellsA);
 
-        if(!validA || !validB){
+        if (!validA || !validB) {
             status = "finished";
 
-            if(!validA && !validB){
+            if (!validA && !validB) {
                 loser = "all";
-            }else if(!validA) {
+            } else if (!validA) {
                 loser = "A";
-            }else{
+            } else {
                 loser = "B";
             }
         }
     }
 
-    private void sendAllMessage(String message){//向两个玩家分别广播消息
-        if(WebSocketServer.users.get(playerA.getId()) != null){
+    private void sendAllMessage(String message) {//向两个玩家分别广播消息
+        if (WebSocketServer.users.get(playerA.getId()) != null) {
             WebSocketServer.users.get(playerA.getId()).sendMessage(message);
         }
-        if(WebSocketServer.users.get(playerB.getId()) != null){
+        if (WebSocketServer.users.get(playerB.getId()) != null) {
             WebSocketServer.users.get(playerB.getId()).sendMessage(message);
         }
     }
 
-    private void sendMove(){//向两个玩家传递移动信息
+    private void sendMove() {//向两个玩家传递移动信息
         lock.lock();
         try {
             JSONObject resp = new JSONObject();
-            resp.put("event","move");
-            resp.put("a_direction",nextStepA);
-            resp.put("b_direction",nextStepB);
+            resp.put("event", "move");
+            resp.put("a_direction", nextStepA);
+            resp.put("b_direction", nextStepB);
             sendAllMessage(resp.toJSONString());
             nextStepA = nextStepB = null;
-        }finally {
+        } finally {
             lock.unlock();
         }
     }
 
-    private String getMapString(){
+    private String getMapString() {
         StringBuilder res = new StringBuilder();
-        for(int i=0;i<rows;++i){
-            for(int j=0;j<cols;++j){
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
                 res.append(g[i][j]);
             }
         }
         return res.toString();
     }
 
-    private void saveToDatabase(){
+    private void saveToDatabase() {
         Record record = new Record(
                 null,
                 playerA.getId(),
@@ -238,37 +297,37 @@ public class Game extends Thread{
         WebSocketServer.recordMapper.insert(record);
     }
 
-    private void sendResult(){ //向两个client发送结果
+    private void sendResult() { //向两个client发送结果
         JSONObject resp = new JSONObject();
-        resp.put("event","result");
-        resp.put("loser",loser);
+        resp.put("event", "result");
+        resp.put("loser", loser);
         saveToDatabase();
         sendAllMessage(resp.toJSONString());
     }
 
     @Override
     public void run() {
-        for(int i=0;i<1000;++i){
-            if(nextStep()){//是否获取两条蛇的下一步操作
+        for (int i = 0; i < 1000; ++i) {
+            if (nextStep()) {//是否获取两条蛇的下一步操作
                 judge();
-                if(status.equals("playing")){
+                if (status.equals("playing")) {
                     sendMove();
-                }else{
+                } else {
                     sendResult();
                     break;
                 }
-            }else{
+            } else {
                 status = "finished";
                 lock.lock();
                 try {
-                    if(nextStepA == null && nextStepB == null){
+                    if (nextStepA == null && nextStepB == null) {
                         loser = "all";
-                    }else if(nextStepA == null){
+                    } else if (nextStepA == null) {
                         loser = "A";
-                    }else{
+                    } else {
                         loser = "B";
                     }
-                }finally {
+                } finally {
                     lock.unlock();
                 }
                 sendResult();

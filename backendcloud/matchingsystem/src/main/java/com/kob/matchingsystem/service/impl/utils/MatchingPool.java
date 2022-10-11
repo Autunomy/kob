@@ -15,7 +15,7 @@ public class MatchingPool extends Thread{
     public static List<Player> players = new ArrayList<>();
     private ReentrantLock lock = new ReentrantLock();
     private static RestTemplate restTemplate;
-    private static final String startGameUrl = "http://localhost:3000/pk/start/game/";
+    private static final String startGameUrl = "http://127.0.0.1:3000/pk/start/game/";
 
     @Autowired
     public void setRestTemplate(RestTemplate restTemplate){
@@ -23,10 +23,10 @@ public class MatchingPool extends Thread{
     }
 
     //添加玩家
-    public void addPlayer(Integer userId,Integer rating){
+    public void addPlayer(Integer userId,Integer rating,Integer botId){
         lock.lock();
         try {
-            players.add(new Player(userId,rating,0));
+            players.add(new Player(userId,rating,botId,0));
         }finally {
             lock.unlock();
         }
@@ -62,7 +62,9 @@ public class MatchingPool extends Thread{
 
         MultiValueMap<String,String> data = new LinkedMultiValueMap<>();
         data.add("a_id",a.getUserId().toString());
+        data.add("a_bot_id",a.getBotId().toString());
         data.add("b_id",b.getUserId().toString());
+        data.add("b_bot_id",b.getBotId().toString());
         restTemplate.postForObject(startGameUrl,data,String.class);
     }
 

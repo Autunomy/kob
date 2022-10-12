@@ -7,6 +7,7 @@ import NotFound from "@/views/error/NotFound";
 import UserAccountLoginView from "@/views/user/account/UserAccountLoginView";
 import UserAccountRegisterView from "@/views/user/account/UserAccountRegisterView";
 import store from "@/store";
+import RecordContentView from "@/views/record/RecordContentView";
 
 const routes = [
     {
@@ -30,6 +31,14 @@ const routes = [
         path: "/record/",
         name: "record_index",
         component: RecordIndexView,
+        meta:{
+            requestAuth:true,
+        }
+    },
+    {
+        path:"/record/:recordId/",
+        name: "record_content",
+        component: RecordContentView,
         meta:{
             requestAuth:true,
         }

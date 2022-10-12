@@ -30,7 +30,7 @@ public class WebSocketServer {
     //存储当前每个用户对应的连接
     public static ConcurrentHashMap<Integer, WebSocketServer> users = new ConcurrentHashMap<>();
 
-    private static UserMapper userMapper;
+    public static UserMapper userMapper;
     public static RecordMapper recordMapper;
     private static BotMapper botMapper;
     public Game game = null;
